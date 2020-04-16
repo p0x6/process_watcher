@@ -1,9 +1,8 @@
 {
-  "name": "process_watcher",
+  "name": "@p0x6/process_watcher",
   "version": "0.0.1",
   "description": "Node.js addon for process watcher to watch for processes to open",
   "main": "index.js",
-  "private": true,
   "gypfile": true,
   "dependencies": {
     "bindings": "~1.5.0",
@@ -11,6 +10,26 @@
   },
   "scripts": {
     "build": "node-gyp configure build --runtime=electron --arch=ia32 --dist-url=https://electronjs.org/headers",
-    "test": "node test.js"
-  }
+    "test": "node test.js",
+    "install": "node-gyp rebuild"
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/p0x6/process_watcher.git"
+  },
+  "keywords": [
+    "c++",
+    "addon",
+    "process",
+    "wmi",
+    "process",
+    "watcher"
+  ],
+  "author": "p0x6",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/p0x6/process_watcher/issues"
+  },
+  "homepage": "https://github.com/p0x6/process_watcher#readme"
 }
