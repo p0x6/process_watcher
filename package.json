@@ -1,7 +1,7 @@
 {
   "name": "@p0x6/process_watcher",
   "version": "0.0.1",
-  "description": "Node.js addon for process watcher to watch for processes to open",
+  "description": "Node.js addon for Windows OS to watch for processes to open",
   "main": "index.js",
   "gypfile": true,
   "dependencies": {
