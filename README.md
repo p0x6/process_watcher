@@ -1,15 +1,19 @@
 # process_watcher
 
+NOTE: WINDOWS ONLY
+
 process_watcher is a nodejs c++ addon for watching for process starting by using the WMI.
 
 ## Installation
 
-TBD
+```
+$ npm install --save @p0x6/process_watcher
+```
 
 ## Usage
 
 ```javascript
-const process_watcher = require('./index');
+const process_watcher = require('@p0x6/process_watcher');
 
 const notepadListener = () => {
     console.log('notepad opened.');
