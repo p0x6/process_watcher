@@ -2,7 +2,7 @@
 #define PROCESS_WATCHER_H
 
 #include <nan.h>
-#include <set>
+#include <map>
 #include <iostream>
 #include <comdef.h>
 #include <Wbemidl.h>
@@ -10,6 +10,7 @@
 
 struct Work {
     uv_work_t  request;
+    std::string s;
     v8::Persistent<v8::Function>* callback;
 };
 
@@ -21,18 +22,16 @@ static void WorkAsyncComplete(uv_work_t* req, int status){
     v8::Isolate* isolate = v8::Isolate::GetCurrent();
     v8::HandleScope handleScope(isolate);
     Work* work = static_cast<Work*>(req->data);
-    v8::Local<v8::Function>::New(isolate, *(work->callback))->Call(isolate->GetCurrentContext(), v8::Null(isolate), 0, NULL);
+    v8::Local<v8::Value> args[1];
+    args[0] = v8::String::NewFromUtf8(isolate, work->s.c_str());
+    v8::Local<v8::Function>::New(isolate, *(work->callback))->Call(isolate->GetCurrentContext(), v8::Null(isolate), 1, args);
 //    work->callback->Reset();
     delete work;
 }
 
-namespace CreationEvent {
-    typedef void(*TNotificationFunc)(void);
-    void registerCreationCallback(v8::Isolate* isolate, std::string& p, v8::Local < v8::Function> f);
-}
-
 class EventSink : public IWbemObjectSink {
-    friend void CreationEvent::registerCreationCallback(v8::Isolate* isolate, std::string& p, v8::Local < v8::Function> f);
+    //friend  CComPtr<EventSink> CreationEvent::registerCreationCallback(v8::Isolate* isolate, std::string& p, v8::Local < v8::Function> f);
+public:
 
     CComPtr<IWbemServices> pSvc;
     CComPtr<IWbemObjectSink> pStubSink;
@@ -73,6 +72,7 @@ public:
         Work* w = new Work();
         w->request.data = w;
         w->callback = &callback_;
+        w->s = proc_name;
         uv_queue_work(uv_default_loop(), &w->request, WorkAsync, WorkAsyncComplete);
         return WBEM_S_NO_ERROR;
     }
@@ -80,6 +80,11 @@ public:
         return WBEM_S_NO_ERROR;
     }
 };
+
+namespace CreationEvent {
+    CComPtr<EventSink> registerCreationCallback(v8::Isolate* isolate, std::string& p, v8::Local < v8::Function> f);
+}
+
 
 class process_watcher_t : public Nan::ObjectWrap {
  public:
@@ -91,11 +96,12 @@ class process_watcher_t : public Nan::ObjectWrap {
 
   static void New(const Nan::FunctionCallbackInfo<v8::Value>& info);
   static void add_listener(const Nan::FunctionCallbackInfo<v8::Value>& info);
-  static void start(const Nan::FunctionCallbackInfo<v8::Value>& info);
-  static void stop(const Nan::FunctionCallbackInfo<v8::Value>& info);
+  static void remove_listener(const Nan::FunctionCallbackInfo<v8::Value>& info);
   static Nan::Persistent<v8::Function> constructor;
 
-  std::set<std::string> registered_callbacks_;
+  std::map<std::string, CComPtr<EventSink> > registered_callbacks_;
 };
+
+bool IsProcessRunning(const char *processName);
 
 #endif

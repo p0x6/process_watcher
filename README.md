@@ -15,18 +15,13 @@ $ npm install --save @p0x6/process_watcher
 ```javascript
 const process_watcher = require('@p0x6/process_watcher');
 
-const notepadListener = () => {
-    console.log('notepad opened.');
-}
-
-const calculatorListener = () => {
-    console.log('calculator opened.');
+const listener = (process) => {
+    console.log(process + ' opened.');
 }
 
 const obj = new process_watcher.ProcessListener();
 
-obj.addListener('notepad.exe',  notepadListener);
-obj.addListener('calculator.exe', calculatorListener);
+obj.addListener(['notepad.exe', 'calculator.exe'],  listener);
 ```
 
 ## Contributing

@@ -1,12 +1,31 @@
 #include "process_watcher.h"
 #include <thread>
 #include <chrono>
+#include <windows.h>
+#include <tlhelp32.h>
 
 Nan::Persistent<v8::Function> process_watcher_t::constructor;
 
 process_watcher_t::process_watcher_t() {}
 
 process_watcher_t::~process_watcher_t() {}
+
+bool IsProcessRunning(const char *processName)
+{
+    bool exists = false;
+    PROCESSENTRY32 entry;
+    entry.dwSize = sizeof(PROCESSENTRY32);
+
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, NULL);
+
+    if (Process32First(snapshot, &entry))
+        while (Process32Next(snapshot, &entry))
+            if (!strcmp(entry.szExeFile, processName))
+                exists = true;
+
+    CloseHandle(snapshot);
+    return exists;
+}
 
 void process_watcher_t::Init(v8::Local<v8::Object> exports) {
   v8::Local<v8::Context> context = exports->CreationContext();
@@ -17,8 +36,7 @@ void process_watcher_t::Init(v8::Local<v8::Object> exports) {
   tpl->InstanceTemplate()->SetInternalFieldCount(1);
 
   Nan::SetPrototypeMethod(tpl, "addListener", add_listener);
-  Nan::SetPrototypeMethod(tpl, "start", start);
-  Nan::SetPrototypeMethod(tpl, "stop", stop);
+  Nan::SetPrototypeMethod(tpl, "removeListener", remove_listener);
 
   constructor.Reset(tpl->GetFunction(context).ToLocalChecked());
   exports->Set(context,
@@ -42,36 +60,52 @@ void process_watcher_t::New(const Nan::FunctionCallbackInfo<v8::Value>& info) {
 
 void process_watcher_t::add_listener(const Nan::FunctionCallbackInfo<v8::Value>& info) {
   v8::Isolate* isolate = info.GetIsolate();
-  if(info.Length() != 2 || !(info[0]->IsString()) || !(info[1]->IsFunction())){
+  if(info.Length() != 2 || !(info[0]->IsArray()) || !(info[1]->IsFunction())){
     isolate->ThrowException(v8::Exception::TypeError(v8::String::NewFromUtf8(isolate, "incorrect arguments set")));
   }
   process_watcher_t* obj = ObjectWrap::Unwrap<process_watcher_t>(info.Holder());
-  v8::Local<v8::String> process_name = info[0]->ToString(isolate);
-  v8::Local<v8::Function> cb = v8::Local<v8::Function>::Cast(info[1]);
-  v8::String::Utf8Value str(isolate, process_name);
-  std::string cpp_str(*str);
-  if (!(obj->registered_callbacks_.insert(cpp_str).second)) {
-      isolate->ThrowException(v8::Exception::TypeError(v8::String::NewFromUtf8(isolate, (std::string("listener for \"") + cpp_str + "\" is already registered").c_str())));
+  v8::Local<v8::Array> arr = v8::Local<v8::Array>::Cast(info[0]);
+  for (int i = 0; i < arr->Length(); ++i) {
+      v8::Local<v8::String> process_name = arr->Get(i)->ToString(isolate);
+      v8::Local<v8::Function> cb = v8::Local<v8::Function>::Cast(info[1]);
+      v8::String::Utf8Value str(isolate, process_name);
+      std::string cpp_str(*str);
+      if (obj->registered_callbacks_.end() != obj->registered_callbacks_.find(cpp_str)) {
+          isolate->ThrowException(v8::Exception::TypeError(v8::String::NewFromUtf8(isolate, (std::string("listener for \"") + cpp_str + "\" is already registered").c_str())));
+      }
+      CComPtr<EventSink> sync = CreationEvent::registerCreationCallback(isolate, cpp_str, cb);
+      obj->registered_callbacks_.insert(std::make_pair(cpp_str, sync));
+      if (IsProcessRunning(*str)) {
+          v8::Local<v8::Value> args[1];
+          args[0] = v8::String::NewFromUtf8(isolate, cpp_str.c_str());
+          v8::Local<v8::Function>::New(isolate, cb)->Call(isolate->GetCurrentContext(), v8::Null(isolate), 1, args);
+      }
   }
-  CreationEvent::registerCreationCallback(isolate, cpp_str, cb);
   info.GetReturnValue().Set(Nan::New(0));
 }
 
-void process_watcher_t::start(const Nan::FunctionCallbackInfo<v8::Value>& info) {
+void process_watcher_t::remove_listener(const Nan::FunctionCallbackInfo<v8::Value>& info) {
     v8::Isolate* isolate = info.GetIsolate();
-    {
-        isolate->Exit();
-        v8::Unlocker unlocker(isolate);
-        std::this_thread::sleep_for(std::chrono::seconds(2));
+    if (info.Length() != 1 || !(info[0]->IsArray())) {
+        isolate->ThrowException(v8::Exception::TypeError(v8::String::NewFromUtf8(isolate, "incorrect arguments set")));
     }
-    v8::Locker locker(isolate);
-    isolate->Enter();
+    process_watcher_t* obj = ObjectWrap::Unwrap<process_watcher_t>(info.Holder());
+    v8::Local<v8::Array> arr = v8::Local<v8::Array>::Cast(info[0]);
+    for (int i = 0; i < arr->Length(); ++i) {
+        v8::Local<v8::String> process_name = arr->Get(i)->ToString(isolate);
+        v8::String::Utf8Value str(isolate, process_name);
+        std::string cpp_str(*str);
+        auto it = obj->registered_callbacks_.find(cpp_str);
+        if (obj->registered_callbacks_.end() == it) {
+            isolate->ThrowException(v8::Exception::TypeError(v8::String::NewFromUtf8(isolate, (std::string("listener for \"") + cpp_str + "\" is already unregistered").c_str())));
+        }
+        it->second->pSvc->CancelAsyncCall(it->second->pStubSink);
+        obj->registered_callbacks_.erase(it);
+    }
+    info.GetReturnValue().Set(Nan::New(0));
 }
 
-void process_watcher_t::stop(const Nan::FunctionCallbackInfo<v8::Value>& info) {
-}
-
-void CreationEvent::registerCreationCallback(v8::Isolate* isolate, std::string& p, v8::Local < v8::Function> f) {
+CComPtr<EventSink> CreationEvent::registerCreationCallback(v8::Isolate* isolate, std::string& p, v8::Local < v8::Function> f) {
     CComPtr<IWbemLocator> pLoc;
     CoInitializeEx(0, COINIT_MULTITHREADED);
     HRESULT hres = CoCreateInstance(CLSID_WbemLocator, 0, CLSCTX_INPROC_SERVER, IID_IWbemLocator, (LPVOID*)&pLoc);
@@ -109,4 +143,5 @@ void CreationEvent::registerCreationCallback(v8::Isolate* isolate, std::string& 
         std::cout << "ExecNotificationQueryAsync failed with = 0x" << std::hex << hres << std::endl;
         throw std::exception("CreationEvent initialization failed");
     }
+    return pSink;
 }

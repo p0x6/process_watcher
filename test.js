@@ -1,17 +1,12 @@
-var process_watcher = require('./index');
+const process_watcher = require('./index');
+const obj = new process_watcher.ProcessListener();
 
-const notepadListener = () => {
-    console.log('League Client opened.');
+const listener = (process) => {
+    console.log(process + ' opened.');
+    obj.removeListener([process]);
 }
 
-const calculatorListener = () => {
-    console.log('League Game opened.');
-}
-
-var obj = new process_watcher.ProcessListener();
-
-obj.addListener('LeagueClient.exe',  notepadListener);
-obj.addListener('League of Legends.exe', calculatorListener);
+obj.addListener(['LeagueClient.exe', 'League of Legends.exe'],  listener);
 
 process.stdin.setRawMode(true);
 process.stdin.resume();
