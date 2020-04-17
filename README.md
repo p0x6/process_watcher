@@ -12,14 +12,16 @@ $ npm install --save @p0x6/process_watcher
 
 ## Usage
 
+If the process is already running when listener is added, it will trigger the callback.
+
 ```javascript
 const process_watcher = require('@p0x6/process_watcher');
+const obj = new process_watcher.ProcessListener();
 
 const listener = (process) => {
     console.log(process + ' opened.');
+    obj.removeListener([process]);
 }
-
-const obj = new process_watcher.ProcessListener();
 
 obj.addListener(['notepad.exe', 'calculator.exe'],  listener);
 ```
