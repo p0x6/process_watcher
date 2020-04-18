@@ -1,6 +1,6 @@
 # process_watcher
 
-NOTE: WINDOWS ONLY
+NOTE: WINDOWS ONLY. TESTED WITH NODE 12.18.X WITH ELECTRON 7+
 
 process_watcher is a nodejs c++ addon for watching for process starting by using the WMI.
 
