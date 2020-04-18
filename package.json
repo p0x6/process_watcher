@@ -1,6 +1,6 @@
 {
   "name": "@p0x6/process_watcher",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Node.js addon for Windows OS to watch for processes to open",
   "main": "index.js",
   "gypfile": true,
@@ -9,7 +9,6 @@
     "nan": "^2.14.0"
   },
   "scripts": {
-    "build": "node-gyp configure build --runtime=electron --arch=ia32 --dist-url=https://electronjs.org/headers",
     "test": "node test.js",
     "install": "node-gyp rebuild"
   },
