@@ -23,7 +23,7 @@ static void WorkAsyncComplete(uv_work_t* req, int status){
     v8::HandleScope handleScope(isolate);
     Work* work = static_cast<Work*>(req->data);
     v8::Local<v8::Value> args[1];
-    args[0] = v8::String::NewFromUtf8(isolate, work->s.c_str());
+    args[0] = v8::String::NewFromUtf8(isolate, work->s.c_str()).ToLocalChecked();
     v8::Local<v8::Function>::New(isolate, *(work->callback))->Call(isolate->GetCurrentContext(), v8::Null(isolate), 1, args);
 //    work->callback->Reset();
     delete work;
